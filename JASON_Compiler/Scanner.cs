@@ -281,7 +281,7 @@ namespace JASON_Compiler
             Tok.lex = Lex;
             //Is it a reserved word?
             if (isReservedWord(Lex))
-                Tok.token_type = ReservedWords[Lex.ToUpper()];
+                Tok.token_type = ReservedWords[Lex.ToLower()];
 
             //Is it an identifier?
             else if (isIdentifier(Lex))
