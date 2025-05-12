@@ -37,7 +37,7 @@ namespace JASON_Compiler
             program.Children.Add(Header());
             program.Children.Add(DeclSec());
             program.Children.Add(Block());
-            program.Children.Add(match(Token_Class.Dot));
+            //program.Children.Add(match(Token_Class.Dot));
             MessageBox.Show("Success");
             return program;
         }
@@ -105,6 +105,7 @@ namespace JASON_Compiler
                 tree.Nodes.Add(treeRoot);
             return tree;
         }
+
         static TreeNode PrintTree(Node root)
         {
             if (root == null || root.Name == null)
