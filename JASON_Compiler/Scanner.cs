@@ -15,13 +15,17 @@ public enum Token_Class
 
     , Arithmatic_Operator, Assignment_Operator, Condition_Operator, Boolean_Operator
 
-    , Plus_Operator,Minus_Operator,Multiply_Operator,Divide_Operator
-    , Less_Than_Operator,More_Than_Operator,Equal_Operator,Not_Equal_Operator
+    , Plus_Operator,Minus_Operator, Multiply_Operator, Divide_Operator
+    , Less_Than_Operator, More_Than_Operator, Equal_Operator, Not_Equal_Operator
     , And_Operator,Or_Operator
 
-    , Semicolon_Symbol,Comma_Symbol,Open_Parenthesis,Close_Parenthesis,Open_Brace,Close_Brace
+    , Semicolon_Symbol, Comma_Symbol, Open_Parenthesis, Close_Parenthesis, Open_Brace, Close_Brace
+
+    , DataType
+
     //, Declaration_Statement, Function_Call, Term, Equation, Expression, FunctionName
     //, Parameter, Function_Declaration, Function_Body, Function_Statement, Program
+
 }
 namespace JASON_Compiler
 {
@@ -78,6 +82,7 @@ namespace JASON_Compiler
             Symbols.Add(")", Token_Class.Close_Parenthesis);
             Symbols.Add("{", Token_Class.Open_Brace);
             Symbols.Add("}", Token_Class.Close_Brace);
+            //Symbols.Add(".", Token_Class.Dot);
 
         }
 
@@ -109,7 +114,7 @@ namespace JASON_Compiler
                     if (r < SourceCode.Length && !(isWhiteSpace(CurrentChar) || isOperator(CurrentChar) || isSymbol(CurrentChar) || CurrentChar == ':'
                     || CurrentChar == '&' || CurrentChar == '|'))
                     { // Error For Invalid Characters
-                        Errors.Error_List.Add("Error Line: " + Line + " ,Invalid Character in Identifier: \" " + CurrentLexeme + " \" that is : \" " + CurrentChar + " \" \n");
+                        Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Invalid Character in Identifier: \" " + CurrentLexeme + " \" that is : \" " + CurrentChar + " \" \n");
                     }
                     FindTokenClass(CurrentLexeme);
                     l = r - 1;
@@ -137,7 +142,7 @@ namespace JASON_Compiler
                     }
                     else
                     { //Error For Comment not closed
-                        Errors.Error_List.Add("Error Line: " + Line + " ,Comment not closed: \" " + CurrentLexeme + " \" \n");
+                        Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Comment not closed: \" " + CurrentLexeme + " \" \n");
                         break;
                     }
                     FindTokenClass(CurrentLexeme);
@@ -160,7 +165,7 @@ namespace JASON_Compiler
                     }
                     if (CurrentChar != '\"')
                     { //Error For String not closed
-                        Errors.Error_List.Add("Error Line: " + Line + ", String not closed: \" " + CurrentLexeme + " \" \n");
+                        Errors.Error_List.Add("Scanning Error Line: " + Line + ", String not closed: \" " + CurrentLexeme + " \" \n");
                         break;
                     }
                     FindTokenClass('\"' + CurrentLexeme + '\"');
@@ -188,7 +193,7 @@ namespace JASON_Compiler
 
                             CurrentChar = SourceCode[r];
                         }
-                        Errors.Error_List.Add("Error Line: " + Line + " ,Invalid Number: " + CurrentLexeme);
+                        Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Invalid Number: " + CurrentLexeme);
                         l = r - 1;
                         continue;
                     }
@@ -199,14 +204,14 @@ namespace JASON_Compiler
                         r++;
                         if (r >= SourceCode.Length)
                         {
-                            Errors.Error_List.Add("Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + "\", Number cannot end with a dot.\n");
+                            Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + "\", Number cannot end with a dot.\n");
                             break;
                         }
                         CurrentChar = SourceCode[r];
 
                         if (r >= SourceCode.Length || isWhiteSpace(CurrentChar))
                         { // Error Decimal no Number "2."
-                            Errors.Error_List.Add("Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + "\", Number cannot end with a dot.\n");
+                            Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + "\", Number cannot end with a dot.\n");
                             l = r - 1;
                             continue;
                         }
@@ -220,7 +225,7 @@ namespace JASON_Compiler
 
                                 CurrentChar = SourceCode[r];
                             }
-                            Errors.Error_List.Add("Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + CurrentChar + "\", Extra decimal point.\n");
+                            Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + CurrentChar + "\", Extra decimal point.\n");
                             l = r - 1;
                             continue;
                         }
@@ -234,7 +239,7 @@ namespace JASON_Compiler
 
                                 CurrentChar = SourceCode[r];
                             }
-                            Errors.Error_List.Add("Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + "\", Expected digit after decimal point.\n");
+                            Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + "\", Expected digit after decimal point.\n");
 
                             l = r - 1;
                             continue;
@@ -251,7 +256,7 @@ namespace JASON_Compiler
 
                                     CurrentChar = SourceCode[r];
                                 }
-                                Errors.Error_List.Add("Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + "\", Multiple decimal points.\n");
+                                Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + "\", Multiple decimal points.\n");
                                 l = r;
                                 break;
                             }
@@ -270,7 +275,7 @@ namespace JASON_Compiler
 
                                 CurrentChar = SourceCode[r];
                             }
-                            Errors.Error_List.Add("Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + "\"\n");
+                            Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Invalid Number: \"" + CurrentLexeme + "\"\n");
                             l = r - 1;
                             continue;
                         }
@@ -294,7 +299,7 @@ namespace JASON_Compiler
                         }
                         else
                         {
-                            Errors.Error_List.Add("Error Line: " + Line + " ,Invalid Operator: \"" + CurrentChar + "\"\n");
+                            Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Invalid Operator: \"" + CurrentChar + "\"\n");
                             continue;
 
                         }
@@ -331,7 +336,7 @@ namespace JASON_Compiler
                         }
                         else
                         {
-                            Errors.Error_List.Add("Error Line: " + Line + " ,Invalid Operator: \"" + CurrentChar + "\"\n");
+                            Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Invalid Operator: \"" + CurrentChar + "\"\n");
                             continue;
                         }
                     }
@@ -348,7 +353,7 @@ namespace JASON_Compiler
                         }
                         else
                         {
-                            Errors.Error_List.Add("Error Line: " + Line + " ,Invalid Operator: \"" + CurrentChar + "\"\n");
+                            Errors.Error_List.Add("Scanning Error Line: " + Line + " ,Invalid Operator: \"" + CurrentChar + "\"\n");
                             continue;
                         }
                     }
@@ -363,7 +368,7 @@ namespace JASON_Compiler
                     FindTokenClass(CurrentChar.ToString());
 
                 else
-                    Errors.Error_List.Add("Error Line: " + Line + ", Invalid Character: " + CurrentChar);
+                    Errors.Error_List.Add("Scanning Error Line: " + Line + ", Invalid Character: " + CurrentChar);
             }
             if (!IsValidParentheses(SourceCode))// FOR Validating parentheses after scanning
                 Errors.Error_List.Add("Error Line: " + Line + ", Unmatched parentheses in the source code.");
