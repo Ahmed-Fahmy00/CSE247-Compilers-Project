@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 public enum Token_Class
 {
-    Unknown, Number, Reserved_Keywords, Comment_Statement, Identifiers, Symbol
+    Unknown, Number, Reserved_Keywords, String, Comment_Statement, Identifier, Symbol
 
     , Int_DataType, Float_DataType, String_DataType
     , Read_Keyword, Write_Keyword, Repeat_Keyword, Until_Keyword
@@ -21,7 +21,7 @@ public enum Token_Class
 
     , Semicolon_Symbol, Comma_Symbol, Open_Parenthesis, Close_Parenthesis, Open_Brace, Close_Brace
 
-    , DataType
+    //, DataType
 
     //, Declaration_Statement, Function_Call, Term, Equation, Expression, FunctionName
     //, Parameter, Function_Declaration, Function_Body, Function_Statement, Program
@@ -82,8 +82,7 @@ namespace JASON_Compiler
             Symbols.Add(")", Token_Class.Close_Parenthesis);
             Symbols.Add("{", Token_Class.Open_Brace);
             Symbols.Add("}", Token_Class.Close_Brace);
-            //Symbols.Add(".", Token_Class.Dot);
-
+            
         }
 
         public void StartScanning(string SourceCode)
@@ -426,13 +425,13 @@ namespace JASON_Compiler
                 Tok.token_type = Token_Class.Comment_Statement;
 
             else if (IsString(Lex))//Is it a string?
-                Tok.token_type = Token_Class.String_DataType;
+                Tok.token_type = Token_Class.String;
 
             else if (IsReservedWord(Lex))//Is it a reserved word?
                 Tok.token_type = ReservedWords[Lex.ToLower()];
 
             else if (IsIdentifier(Lex))//Is it an identifier?
-                Tok.token_type = Token_Class.Identifiers;
+                Tok.token_type = Token_Class.Identifier;
 
             else if (IsConstant(Lex))//Is it a Constant?
                 Tok.token_type = Token_Class.Number;
