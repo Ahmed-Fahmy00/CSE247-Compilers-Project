@@ -430,7 +430,7 @@ namespace JASON_Compiler
             if (isStatment() == true)
             {
                 statementsD.Children.Add(P_Statement());
-                statementsD.Children.Add(P_Statements_D());
+
                 return statementsD;
             }
             return null;
@@ -540,17 +540,17 @@ namespace JASON_Compiler
         }
         Node P_Functions()
         {
-            if (InputPointer >= TokenStream.Count) return null;
+
             Node functionStatements = new Node("Functions");
 
             functionStatements.Children.Add(P_Function());
-            functionStatements.Children.Add(P_Functions_D());
+            //functionStatements.Children.Add(P_Functions_D());
 
             return functionStatements;
         }
         Node P_Functions_D()
         {
-            if (InputPointer >= TokenStream.Count) return null;
+
             Node functionStatementsD = new Node("FunctionsD");
 
             if ((  TokenStream[InputPointer].token_type == Token_Class.Int_DataType 
@@ -558,8 +558,8 @@ namespace JASON_Compiler
                 || TokenStream[InputPointer].token_type == Token_Class.String_DataType  )
                 && TokenStream[InputPointer + 1].token_type != Token_Class.Main_Keyword )
             {
+
                 functionStatementsD.Children.Add(P_Functions());
-                functionStatementsD.Children.Add(P_Functions_D());
                 return functionStatementsD;
             }
             return null;
@@ -567,7 +567,6 @@ namespace JASON_Compiler
 
         Node P_Main_function()
         {
-            if (InputPointer >= TokenStream.Count) return null;
             Node mainFunction = new Node("MainFunction");
 
             mainFunction.Children.Add(match(Token_Class.Int_DataType));
@@ -586,6 +585,8 @@ namespace JASON_Compiler
         {
             if (InputPointer < TokenStream.Count)
             {
+                if(TokenStream[InputPointer].token_type == Token_Class.Comment_Statement)
+                    InputPointer++;
                 if (ExpectedToken == TokenStream[InputPointer].token_type)
                 {
                     InputPointer++;
