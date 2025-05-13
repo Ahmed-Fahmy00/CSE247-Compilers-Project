@@ -31,18 +31,9 @@ namespace JASON_Compiler
             this.InputPointer = 0;
             this.TokenStream = TokenStream;
             root = new Node("Program");
-            root.Children.Add(Program());
+            root.Children.Add(P_Functions());
+            root.Children.Add(P_Main_function());
             return root;
-        }
-
-        Node Program()
-        {
-            Node program = new Node("Program");
-
-            program.Children.Add(P_Functions());
-            program.Children.Add(P_Main_function());
-
-            return program;
         }
 
         Node P_DataType()
@@ -337,7 +328,6 @@ namespace JASON_Compiler
             ifStatement.Children.Add(P_Condition_statement());
             ifStatement.Children.Add(match(Token_Class.Then_Keyword));
             ifStatement.Children.Add(P_Statements());
-            ifStatement.Children.Add(P_Return_statement());
             ifStatement.Children.Add(P_Else_if_statement());
             ifStatement.Children.Add(P_Else_statement());
             ifStatement.Children.Add(match(Token_Class.End_Keyword));
@@ -407,12 +397,17 @@ namespace JASON_Compiler
             {
                 statement.Children.Add(P_Repeat_statement());
             }
-            else if (TokenStream[InputPointer].token_type == Token_Class.Identifier &&
-                     TokenStream[InputPointer + 1].token_type == Token_Class.Open_Parenthesis)
+            else if (TokenStream[InputPointer].token_type == Token_Class.Identifier && TokenStream[InputPointer + 1].token_type == Token_Class.Open_Parenthesis)
+                        
             {
                 statement.Children.Add(P_Function_call());
+                statement.Children.Add(match(Token_Class.Semicolon_Symbol));
             }
-
+            else
+            {
+                Errors.Error_List.Add("Parsing Error: Expected Statement and " + TokenStream[InputPointer].token_type.ToString() + " found\r\n");
+                InputPointer++;
+            }
                 return statement;
         }
         Node P_Statements()
@@ -427,9 +422,10 @@ namespace JASON_Compiler
         {
             Node statementsD = new Node("StatementsD");
 
-            if (isStatment() == true)
+            if (IsStartOfStatement() == true)
             {
                 statementsD.Children.Add(P_Statement());
+                statementsD.Children.Add(P_Statements_D());
 
                 return statementsD;
             }
@@ -633,20 +629,29 @@ namespace JASON_Compiler
             }
             return tree;
         }
-
-        bool isStatment()
+        bool IsStartOfStatement()
         {
-            if (InputPointer + 1 >= TokenStream.Count) return false;
+            if (InputPointer >= TokenStream.Count)
+                return false;
 
-            Token_Class type = TokenStream[InputPointer + 1].token_type;
-            return type == Token_Class.Identifier ||
-                   type == Token_Class.Read_Keyword ||
-                   type == Token_Class.Write_Keyword ||
-                   type == Token_Class.If_Keyword ||
-                   type == Token_Class.Else_If_Keyword ||
-                   type == Token_Class.Else_Keyword ||
-                   type == Token_Class.Repeat_Keyword ||
-                   type == Token_Class.Return_Keyword;
+            Token_Class currentToken = TokenStream[InputPointer].token_type;
+            Token_Class nextToken = Token_Class.Unknown; // Assuming Token_Class.Null or a similar placeholder exists
+            if (InputPointer + 1 < TokenStream.Count)
+        {
+                nextToken = TokenStream[InputPointer + 1].token_type;
+            }
+
+            if (currentToken == Token_Class.Write_Keyword) return true;
+            if (currentToken == Token_Class.Read_Keyword) return true;
+            if (currentToken == Token_Class.Identifier && nextToken == Token_Class.Assignment_Operator) return true;
+            if (currentToken == Token_Class.Int_DataType ||
+                currentToken == Token_Class.Float_DataType ||
+                currentToken == Token_Class.String_DataType) return true; // Declaration
+            if (currentToken == Token_Class.If_Keyword) return true;
+            if (currentToken == Token_Class.Repeat_Keyword) return true;
+            if (currentToken == Token_Class.Identifier && nextToken == Token_Class.Open_Parenthesis) return true; // Function call statement
+
+            return false;
         }
         bool IsArithmaticOperator()
         {
