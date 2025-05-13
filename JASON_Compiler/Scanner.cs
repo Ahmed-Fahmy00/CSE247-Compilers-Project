@@ -20,12 +20,7 @@ public enum Token_Class
     , And_Operator,Or_Operator
 
     , Semicolon_Symbol, Comma_Symbol, Open_Parenthesis, Close_Parenthesis, Open_Brace, Close_Brace
-
-    //, DataType
-
-    //, Declaration_Statement, Function_Call, Term, Equation, Expression, FunctionName
-    //, Parameter, Function_Declaration, Function_Body, Function_Statement, Program
-
+    
 }
 namespace JASON_Compiler
 {

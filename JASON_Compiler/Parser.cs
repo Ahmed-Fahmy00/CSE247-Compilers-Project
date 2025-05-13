@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -44,13 +45,14 @@ namespace JASON_Compiler
             return program;
         }
 
-
         Node P_DataType()
         {
             //dataType -> int | float | string
             Node dataType = new Node("DataType");
 
-            if (TokenStream[InputPointer].token_type == Token_Class.Int_DataType || TokenStream[InputPointer].token_type == Token_Class.Float_DataType || TokenStream[InputPointer].token_type == Token_Class.String_DataType)
+            if (   TokenStream[InputPointer].token_type == Token_Class.Int_DataType 
+                || TokenStream[InputPointer].token_type == Token_Class.Float_DataType 
+                || TokenStream[InputPointer].token_type == Token_Class.String_DataType)
                 dataType.Children.Add(match(TokenStream[InputPointer].token_type));
 
             return dataType;
@@ -66,22 +68,7 @@ namespace JASON_Compiler
             else if (TokenStream[InputPointer].token_type == Token_Class.Multiply_Operator)
                 arithmaticOperator.Children.Add(match(Token_Class.Multiply_Operator));
             else if (TokenStream[InputPointer].token_type == Token_Class.Divide_Operator)
-                arithmaticOperator.Children.Add(match(Token_Class.Divide_Operator);
-
-            return arithmaticOperator;
-        }
-        Node P_Arithmatic_Operator()
-        {
-            //arithmatic operator -> plusOp |minusOp | multiplyOp | divideOp
-            Node arithmaticOperator = new Node("ArithmaticOperator");
-            if (TokenStream[InputPointer].token_type == Token_Class.Plus_Operator)
-                arithmaticOperator.Children.Add(match(Token_Class.Plus_Operator));
-            else if (TokenStream[InputPointer].token_type == Token_Class.Minus_Operator)
-                arithmaticOperator.Children.Add(match(Token_Class.Minus_Operator));
-            else if (TokenStream[InputPointer].token_type == Token_Class.Multiply_Operator)
-                arithmaticOperator.Children.Add(match(Token_Class.Multiply_Operator));
-            else if (TokenStream[InputPointer].token_type == Token_Class.Divide_Operator)
-                arithmaticOperator.Children.Add(match(Token_Class.Divide_Operator);
+                arithmaticOperator.Children.Add(match(Token_Class.Divide_Operator));
 
             return arithmaticOperator;
         }
@@ -105,55 +92,49 @@ namespace JASON_Compiler
         {
             //boolean operator -> andOperator | orOperator
             Node booleanOperator = new Node("BooleanOperator");
+
             if (TokenStream[InputPointer].token_type == Token_Class.And_Operator)
                 booleanOperator.Children.Add(match(Token_Class.And_Operator));
             else if (TokenStream[InputPointer].token_type == Token_Class.Or_Operator)
                 booleanOperator.Children.Add(match(Token_Class.Or_Operator));
  
-            // write your code here to check the boolean operator
             return booleanOperator;
         }
+
         Node P_Term()
         {
             //Term → number | identifier | Function_call
             Node term = new Node("Term");
             if (TokenStream[InputPointer].token_type == Token_Class.Number)
                 term.Children.Add(match(Token_Class.Number));
-            else if (TokenStream[InputPointer].token_type == Token_Class.Identifiers)
-                term.Children.Add(match(Token_Class.Identifiers));
-            else if (TokenStream[InputPointer].token_type == Token_Class.Function_Call)
-                term.Children.Add(P_Function_call());
+            else if (TokenStream[InputPointer].token_type == Token_Class.Identifier) 
+            {
+                if (TokenStream[InputPointer+1].token_type == Token_Class.Open_Parenthesis)
+                    term.Children.Add(P_Function_call());
+                else
+                    term.Children.Add(match(Token_Class.Identifier));
+            }
             return term; ;
         }
-
         Node P_Expression()
         {
             //Expression → stringLine | Term | Equation
 
             Node expression = new Node("Expression");
 
-            if (InputPointer >= TokenStream.Count)
-                return expression;
-
+            if (InputPointer >= TokenStream.Count) return expression;
+                
             Token_Class type = TokenStream[InputPointer].token_type;
 
             if (type == Token_Class.String)
-            {
                 expression.Children.Add(match(Token_Class.String));
-            }
             else if (IsEquation())
-            {
                 expression.Children.Add(P_Equation());
-            }
             else if (IsTerm())
-            {
                 expression.Children.Add(P_Term());
-            }
-     
-
+            
             return expression;
         }
-
         Node P_Equation()
         {
             //Equation -> (Equation) Equation’ | Term Equation’
@@ -172,14 +153,13 @@ namespace JASON_Compiler
                 equation.Children.Add(P_Equation_D());
             }
             return equation;
-            // write your code here to check the equation
-            
         }
         Node P_Equation_D()
         {
             // Ops Equation Equation’ | epsilon
             Node equationD = new Node("EquationD");
-               if(IsArithmaticOperator())            {
+            if(IsArithmaticOperator())            
+            {
                 equationD.Children.Add(P_Arithmatic_Operator());
                 equationD.Children.Add(P_Equation());
                 equationD.Children.Add(P_Equation_D());
@@ -188,141 +168,323 @@ namespace JASON_Compiler
             return null;
         }
 
-            
-                Node P_Condition()
+        Node P_Condition()
         {
+            //Condition → identifier ConditionOp Term
             Node condition = new Node("Condition");
-            // write your code here to check the condition
+            if (TokenStream[InputPointer].token_type == Token_Class.Identifier)
+            {
+                condition.Children.Add(match(Token_Class.Identifier));
+                condition.Children.Add(P_Condition_Operator());
+                condition.Children.Add(P_Term());
+            }
             return condition;
-        }
-
-
-        Node P_Return_statement()
-        {
-            Node returnStatement = new Node("ReturnStatement");
-            // write your code here to check the return statement
-            return returnStatement;
-        }
-
-        Node P_Write_statement()
-        {
-            Node writeStatement = new Node("WriteStatement");
-            // write your code here to check the write statement
-            return writeStatement;
-        }
-        Node P_Write_statement_D()
-        {
-            Node writeStatementD = new Node("WriteStatementD");
-            // write your code here to check the write statement D
-            return writeStatementD;
-        }
-
-
-        Node P_Read_statement()
-        {
-            Node readStatement = new Node("ReadStatement");
-            // write your code here to check the read statement
-            return readStatement;
-        }
-        Node P_Assignment_statement()
-        {
-            Node assignmentStatement = new Node("AssignmentStatement");
-            // write your code here to check the assignment statement
-            return assignmentStatement;
-        }
-        Node P_Declaration_statement()
-        {
-            Node declarationStatement = new Node("DeclarationStatement");
-            // write your code here to check the declaration statement
-            return declarationStatement;
-        }
-        Node P_Repeat_statement()
-        {
-            Node repeatStatement = new Node("RepeatStatement");
-            // write your code here to check the repeat statement
-            return repeatStatement;
         }
         Node P_Condition_statement()
         {
+            //Condition_statement → Condition Condition_statement
             Node conditionStatement = new Node("ConditionStatement");
-            // write your code here to check the condition statement
+
+            conditionStatement.Children.Add(P_Condition());
+            conditionStatement.Children.Add(P_Condition_statement_D());
+
             return conditionStatement;
         }
         Node P_Condition_statement_D()
         {
+            //Condition_statement_D → Boolean_Operator Condition Condition_statement' | epsilon
             Node conditionStatementD = new Node("ConditionStatementD");
-            // write your code here to check the condition statement D
+            if (   TokenStream[InputPointer].token_type == Token_Class.And_Operator 
+                || TokenStream[InputPointer].token_type == Token_Class.Or_Operator )
+            {
+                conditionStatementD.Children.Add(P_Boolean_Operator());
+                conditionStatementD.Children.Add(P_Condition());
+                conditionStatementD.Children.Add(P_Condition_statement_D());
+            }
+            else  
+                return null; 
+
             return conditionStatementD;
+
         }
 
+        Node P_Read_statement()
+        {
+            Node readStatement = new Node("ReadStatement");
+
+            readStatement.Children.Add(match(Token_Class.Read_Keyword));
+            readStatement.Children.Add(match(Token_Class.Identifier));
+            readStatement.Children.Add(match(Token_Class.Semicolon_Symbol));
+
+            return readStatement;
+        }
+        Node P_Write_statement()
+        {
+            // Write_statement → write Write_statement’
+            Node writeStatement = new Node("WriteStatement");
+
+            writeStatement.Children.Add(match(Token_Class.Write_Keyword));
+            writeStatement.Children.Add(P_Write_statement_D());
+
+            return writeStatement;
+
+        }
+        Node P_Write_statement_D()
+        {
+            // Write_statement’ → Expression ; | endl ;
+            Node writeStatementD = new Node("WriteStatementD");
+
+            if (TokenStream[InputPointer].token_type == Token_Class.String || IsEquation() || IsTerm())
+            {
+                writeStatementD.Children.Add(P_Expression());
+                writeStatementD.Children.Add(match(Token_Class.Semicolon_Symbol));
+            }
+            else if (TokenStream[InputPointer].token_type == Token_Class.Endl_Keyword)
+            {
+                writeStatementD.Children.Add(match(Token_Class.Endl_Keyword));
+                writeStatementD.Children.Add(match(Token_Class.Semicolon_Symbol));
+            }
+
+            return writeStatementD;
+        }
+
+        Node P_Identifier()
+        {
+            Node identifier = new Node("Identifier");
+
+            identifier.Children.Add(match(Token_Class.Identifier));
+            identifier.Children.Add(P_Identifier_D());
+
+            return identifier;
+        }
+        Node P_Identifier_D()
+        {
+            Node identifier_D = new Node("IdentifierD");
+
+            if (TokenStream[InputPointer].token_type == Token_Class.Assignment_Operator)
+            {
+                identifier_D.Children.Add(match(Token_Class.Assignment_Operator));
+                identifier_D.Children.Add(P_Expression());
+
+                return identifier_D;
+            }
+            else
+                return null;
+        }
+        Node P_Identifier_List()
+        {
+            Node identifier_list = new Node("IdentifierList");
+
+            identifier_list.Children.Add(P_Identifier());
+            identifier_list.Children.Add(P_Identifier_List_D());
+
+            return identifier_list;
+        }
+        Node P_Identifier_List_D()
+        {
+            Node identifier_list_D = new Node("IdentifierListD");
+
+            if (TokenStream[InputPointer].token_type == Token_Class.Comma_Symbol)
+            {
+                identifier_list_D.Children.Add(match(Token_Class.Comma_Symbol));
+                identifier_list_D.Children.Add(P_Identifier());
+                identifier_list_D.Children.Add(P_Identifier_List_D());
+
+                return identifier_list_D;
+            }
+            else
+                return null;
+        }
+        Node P_Declaration_statement()
+        {
+            Node declarationStatement = new Node("DeclarationStatement");
+
+            declarationStatement.Children.Add(P_DataType());
+            declarationStatement.Children.Add(P_Identifier_List());
+            declarationStatement.Children.Add(match(Token_Class.Semicolon_Symbol));
+
+            return declarationStatement;
+        }
+        Node P_Assignment_statement()
+        {
+            Node assignmentStatement = new Node("AssignmentStatement");
+
+            assignmentStatement.Children.Add(match(Token_Class.Identifier));
+            assignmentStatement.Children.Add(match(Token_Class.Assignment_Operator));
+            assignmentStatement.Children.Add(P_Expression());
+            assignmentStatement.Children.Add(match(Token_Class.Semicolon_Symbol));
+
+            return assignmentStatement;
+        }
+        Node P_Repeat_statement()
+        {
+            Node repeatStatement = new Node("RepeatStatement");
+
+            repeatStatement.Children.Add(match(Token_Class.Repeat_Keyword));
+            repeatStatement.Children.Add(P_Statements());
+            repeatStatement.Children.Add(match(Token_Class.Until_Keyword));
+            repeatStatement.Children.Add(P_Condition_statement());
+
+            return repeatStatement;
+        }
+       
         Node P_If_statement()
         {
+            //If_statement → if Condition_statement then Statements Ret_statement Else_if_statement Else_statement end
             Node ifStatement = new Node("IfStatement");
-            // write your code here to check the if statement
+            
+            ifStatement.Children.Add(match(Token_Class.If_Keyword));
+            ifStatement.Children.Add(P_Condition_statement());
+            ifStatement.Children.Add(match(Token_Class.Then_Keyword));
+            ifStatement.Children.Add(P_Statements());
+            ifStatement.Children.Add(P_Return_statement());
+            ifStatement.Children.Add(P_Else_if_statement());
+            ifStatement.Children.Add(P_Else_statement());
+            ifStatement.Children.Add(match(Token_Class.End_Keyword));
+
             return ifStatement;
         }
         Node P_Else_if_statement()
         {
+            // Else_if_statement → else if Condition_statement then Statements Ret_statement Else_statement | epsilon
             Node elseIfStatement = new Node("ElseIfStatement");
-            // write your code here to check the else if statement
-            return elseIfStatement;
+            if (TokenStream[InputPointer].token_type == Token_Class.Else_If_Keyword)
+            {
+                elseIfStatement.Children.Add(match(Token_Class.Else_If_Keyword));
+                elseIfStatement.Children.Add(P_Condition_statement());
+                elseIfStatement.Children.Add(match(Token_Class.Then_Keyword));
+                elseIfStatement.Children.Add(P_Statements());
+                elseIfStatement.Children.Add(P_Else_statement());
+
+                return elseIfStatement;
+            }
+            else
+                return null;
         }
         Node P_Else_statement()
         {
+            // Else_statement → else Statements | epsilon
             Node elseStatement = new Node("ElseStatement");
-            // write your code here to check the else statement
-            return elseStatement;
+
+            if (TokenStream[InputPointer].token_type == Token_Class.Else_Keyword)
+            {
+                elseStatement.Children.Add(match(Token_Class.Else_Keyword));
+                elseStatement.Children.Add(P_Statements());
+                return elseStatement;
+            }
+            else
+                return null;
         }
 
         Node P_Statement()
         {
             Node statement = new Node("Statement");
-            
 
+            if (TokenStream[InputPointer].token_type == Token_Class.Write_Keyword)
+            {
+                statement.Children.Add(P_Write_statement());
+            }
+            else if (TokenStream[InputPointer].token_type == Token_Class.Read_Keyword)
+            {
+                statement.Children.Add(P_Read_statement());
+            }
+            else if (TokenStream[InputPointer].token_type == Token_Class.Identifier &&
+                     TokenStream[InputPointer + 1].token_type == Token_Class.Assignment_Operator)
+            {
+                statement.Children.Add(P_Assignment_statement());
+            }
+            else if (TokenStream[InputPointer].token_type == Token_Class.Int_DataType ||
+                     TokenStream[InputPointer].token_type == Token_Class.Float_DataType ||
+                     TokenStream[InputPointer].token_type == Token_Class.String_DataType)
+            {
+                statement.Children.Add(P_Declaration_statement());
+            }
+            else if (TokenStream[InputPointer].token_type == Token_Class.If_Keyword)
+            {
+                statement.Children.Add(P_If_statement());
+            }
+            else if (TokenStream[InputPointer].token_type == Token_Class.Repeat_Keyword)
+            {
+                statement.Children.Add(P_Repeat_statement());
+            }
+            else if (TokenStream[InputPointer].token_type == Token_Class.Identifier &&
+                     TokenStream[InputPointer + 1].token_type == Token_Class.Open_Parenthesis)
+            {
+                statement.Children.Add(P_Function_call());
+            }
 
-            return statement;
+                return statement;
         }
         Node P_Statements()
         {
             Node statements = new Node("Statements");
 
-            
-
+            statements.Children.Add(P_Statement());
+            statements.Children.Add(P_Statements_D());
             return statements;
         }
         Node P_Statements_D()
         {
             Node statementsD = new Node("StatementsD");
-            
 
+            if (isStatment() == true)
+            {
+                statementsD.Children.Add(P_Statement());
+                statementsD.Children.Add(P_Statements_D());
+                return statementsD;
+            }
+            return null;
 
-            return statementsD;
+        }
+
+        Node P_Return_statement()
+        {
+            Node returnStatement = new Node("ReturnStatement");
+
+            returnStatement.Children.Add(match(Token_Class.Return_Keyword));
+            returnStatement.Children.Add(P_Expression());
+            returnStatement.Children.Add(match(Token_Class.Semicolon_Symbol));
+
+            return returnStatement;
         }
 
         Node P_Parameter()
         {
             Node parameter = new Node("Parameter");
-            
 
-
-            return parameter;
+            if (   TokenStream[InputPointer].token_type == Token_Class.Int_DataType 
+                || TokenStream[InputPointer].token_type == Token_Class.Float_DataType 
+                || TokenStream[InputPointer].token_type == Token_Class.String_DataType )
+            {
+                parameter.Children.Add(match(TokenStream[InputPointer].token_type));
+                parameter.Children.Add(match(Token_Class.Identifier));
+                return parameter;
+            }
+            else
+                return null;
         }
         Node P_Parameters()
         {
-            Node parameterD = new Node("Parameters");
+            Node parameters = new Node("Parameters");
 
+            parameters.Children.Add(P_Parameter());
+            parameters.Children.Add(P_Parameters_D());
 
-
-            return parameterD;
+            return parameters;
         }
         Node P_Parameters_D()
         {
             Node parameterD = new Node("ParametersD");
-            
 
-
-            return parameterD;
+            if (TokenStream[InputPointer].token_type == Token_Class.Comma_Symbol)
+            {
+                parameterD.Children.Add(match(Token_Class.Comma_Symbol));
+                parameterD.Children.Add(P_Parameter());
+                parameterD.Children.Add(P_Parameters_D());
+            }
+            return null;
         }
+
         Node P_Function_call()
         {
             Node functionCall = new Node("FunctionCall");
@@ -344,7 +506,7 @@ namespace JASON_Compiler
             functionDeclaration.Children.Add(P_DataType());
             functionDeclaration.Children.Add(match(Token_Class.Identifier));
             functionDeclaration.Children.Add(match(Token_Class.Open_Parenthesis));
-            functionDeclaration.Children.Add(P_Parameter());
+            functionDeclaration.Children.Add(P_Parameters());
             functionDeclaration.Children.Add(match(Token_Class.Close_Parenthesis));
 
             return functionDeclaration;
@@ -378,6 +540,7 @@ namespace JASON_Compiler
         }
         Node P_Functions()
         {
+            if (InputPointer >= TokenStream.Count) return null;
             Node functionStatements = new Node("Functions");
 
             functionStatements.Children.Add(P_Function());
@@ -387,6 +550,7 @@ namespace JASON_Compiler
         }
         Node P_Functions_D()
         {
+            if (InputPointer >= TokenStream.Count) return null;
             Node functionStatementsD = new Node("FunctionsD");
 
             if ((  TokenStream[InputPointer].token_type == Token_Class.Int_DataType 
@@ -400,8 +564,10 @@ namespace JASON_Compiler
             }
             return null;
         }
+
         Node P_Main_function()
         {
+            if (InputPointer >= TokenStream.Count) return null;
             Node mainFunction = new Node("MainFunction");
 
             mainFunction.Children.Add(match(Token_Class.Int_DataType));
@@ -410,6 +576,7 @@ namespace JASON_Compiler
             mainFunction.Children.Add(match(Token_Class.Close_Parenthesis));
             mainFunction.Children.Add(match(Token_Class.Open_Brace));
             mainFunction.Children.Add(P_Statements());
+            mainFunction.Children.Add(P_Return_statement());
             mainFunction.Children.Add(match(Token_Class.Close_Brace));
 
             return mainFunction;
@@ -417,7 +584,6 @@ namespace JASON_Compiler
 
         public Node match(Token_Class ExpectedToken)
         {
-
             if (InputPointer < TokenStream.Count)
             {
                 if (ExpectedToken == TokenStream[InputPointer].token_type)
@@ -465,7 +631,21 @@ namespace JASON_Compiler
                 tree.Nodes.Add(PrintTree(child));
             }
             return tree;
+        }
 
+        bool isStatment()
+        {
+            if (InputPointer + 1 >= TokenStream.Count) return false;
+
+            Token_Class type = TokenStream[InputPointer + 1].token_type;
+            return type == Token_Class.Identifier ||
+                   type == Token_Class.Read_Keyword ||
+                   type == Token_Class.Write_Keyword ||
+                   type == Token_Class.If_Keyword ||
+                   type == Token_Class.Else_If_Keyword ||
+                   type == Token_Class.Else_Keyword ||
+                   type == Token_Class.Repeat_Keyword ||
+                   type == Token_Class.Return_Keyword;
         }
         bool IsArithmaticOperator()
         {
@@ -481,8 +661,8 @@ namespace JASON_Compiler
         bool IsTerm()
         {
             Token_Class tmp = TokenStream[InputPointer].token_type;
-            if (tmp == Token_Class.Number || (tmp == Token_Class.Identifiers && true && TokenStream[InputPointer + 1].token_type == Token_Class.Open_Parenthesis) ||
-                tmp == Token_Class.Identifiers)
+            if (tmp == Token_Class.Number || (tmp == Token_Class.Identifier && true && TokenStream[InputPointer + 1].token_type == Token_Class.Open_Parenthesis) ||
+                tmp == Token_Class.Identifier)
             {
                 return true;
             }
@@ -498,10 +678,6 @@ namespace JASON_Compiler
             return false;
         }
 
-
-
-
     }
-
 
 }
