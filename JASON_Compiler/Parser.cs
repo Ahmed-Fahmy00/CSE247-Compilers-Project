@@ -22,12 +22,29 @@ namespace JASON_Compiler
 
     public class Parser
     {
+
         int InputPointer = 0;
         List<Token> TokenStream;
         public  Node root;
-        
+        private HashSet<Token_Class> SafeTokens;
         public Node StartParsing(List<Token> TokenStream)
         {
+            this.SafeTokens = new HashSet<Token_Class>
+            {
+                Token_Class.Semicolon_Symbol,
+                Token_Class.Close_Brace,     
+                Token_Class.End_Keyword,     
+                Token_Class.Write_Keyword,
+                Token_Class.Read_Keyword,
+                Token_Class.If_Keyword,
+                Token_Class.Repeat_Keyword,
+                Token_Class.Int_DataType,    
+                Token_Class.Float_DataType,
+                Token_Class.String_DataType,
+                Token_Class.Identifier,      
+                Token_Class.Comment_Statement, 
+                Token_Class.Main_Keyword
+            };
             this.InputPointer = 0;
             this.TokenStream = TokenStream;
             root = new Node("Program");
@@ -35,23 +52,45 @@ namespace JASON_Compiler
             root.Children.Add(P_Main_function());
             return root;
         }
+        void Recover()
+        {
+            Errors.Error_List.Add("Unexpected Token: Attempting to synchronize parser.");
+            while (InputPointer < TokenStream.Count)
+            {
+                Token_Class currentToken = TokenStream[InputPointer].token_type;
+                if (SafeTokens.Contains(currentToken))
+                {
+                    if (currentToken == Token_Class.Semicolon_Symbol)
+                    {
+                        InputPointer++; 
+                    }
+                    Errors.Error_List.Add($"Synchronization recovery: Resuming parse near token '{currentToken}'.");
+                    return;
+                }
+                InputPointer++;
+            }
+            Errors.Error_List.Add("Synchronization recovery: Reached end of input while recovering.");
+        }
 
         Node P_DataType()
         {
+
             //dataType -> int | float | string
             Node dataType = new Node("DataType");
-
+            SkipComments();
             if (   TokenStream[InputPointer].token_type == Token_Class.Int_DataType 
                 || TokenStream[InputPointer].token_type == Token_Class.Float_DataType 
                 || TokenStream[InputPointer].token_type == Token_Class.String_DataType)
                 dataType.Children.Add(match(TokenStream[InputPointer].token_type));
-
+            else
+                return null; 
             return dataType;
         }
         Node P_Arithmatic_Operator()
         {
             //arithmatic operator -> plusOp |minusOp | multiplyOp | divideOp
             Node arithmaticOperator = new Node("ArithmaticOperator");
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.Plus_Operator)
                 arithmaticOperator.Children.Add(match(Token_Class.Plus_Operator));
             else if (TokenStream[InputPointer].token_type == Token_Class.Minus_Operator)
@@ -60,6 +99,8 @@ namespace JASON_Compiler
                 arithmaticOperator.Children.Add(match(Token_Class.Multiply_Operator));
             else if (TokenStream[InputPointer].token_type == Token_Class.Divide_Operator)
                 arithmaticOperator.Children.Add(match(Token_Class.Divide_Operator));
+            else
+                return null; 
 
             return arithmaticOperator;
         }
@@ -67,7 +108,7 @@ namespace JASON_Compiler
         {
             //condition operator -> notEqualOp | equalOp | lessThanOp | moreThanOp
             Node conditionOperator = new Node("ConditionOperator");
-
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.Not_Equal_Operator)
                 conditionOperator.Children.Add(match(Token_Class.Not_Equal_Operator));
             else if (TokenStream[InputPointer].token_type == Token_Class.Equal_Operator)
@@ -76,19 +117,20 @@ namespace JASON_Compiler
                 conditionOperator.Children.Add(match(Token_Class.Less_Than_Operator));
             else if (TokenStream[InputPointer].token_type == Token_Class.More_Than_Operator)
                 conditionOperator.Children.Add(match(Token_Class.More_Than_Operator));
-
+            else
+                return null; 
             return conditionOperator;
         }
         Node P_Boolean_Operator()
         {
             //boolean operator -> andOperator | orOperator
             Node booleanOperator = new Node("BooleanOperator");
-
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.And_Operator)
                 booleanOperator.Children.Add(match(Token_Class.And_Operator));
             else if (TokenStream[InputPointer].token_type == Token_Class.Or_Operator)
                 booleanOperator.Children.Add(match(Token_Class.Or_Operator));
- 
+            else return null; 
             return booleanOperator;
         }
 
@@ -96,6 +138,7 @@ namespace JASON_Compiler
         {
             //Term → number | identifier | Function_call
             Node term = new Node("Term");
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.Number)
                 term.Children.Add(match(Token_Class.Number));
             else if (TokenStream[InputPointer].token_type == Token_Class.Identifier) 
@@ -112,7 +155,7 @@ namespace JASON_Compiler
             //Expression → stringLine | Term | Equation
 
             Node expression = new Node("Expression");
-
+            SkipComments();
             if (InputPointer >= TokenStream.Count) return expression;
                 
             Token_Class type = TokenStream[InputPointer].token_type;
@@ -131,43 +174,88 @@ namespace JASON_Compiler
             //Equation -> (Equation) Equation’ | Term Equation’
 
             Node equation = new Node("Equation");
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.Open_Parenthesis)
             {
-                equation.Children.Add(match(Token_Class.Open_Parenthesis));
-                equation.Children.Add(P_Equation());
-                equation.Children.Add(match(Token_Class.Close_Parenthesis));
-                equation.Children.Add(P_Equation_D());
+                Node open = match(Token_Class.Open_Parenthesis);
+                if (open != null)
+                    equation.Children.Add(open);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected '(' in equation.");
+                Node equa = P_Equation();
+                if (equa != null)
+                    equation.Children.Add(equa);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected equation inside parentheses.");
+                Node close = match(Token_Class.Close_Parenthesis);
+                if (close != null)
+                    equation.Children.Add(close);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected ')' in equation.");
+                Node node = P_Equation_D();
+                if (node != null)
+                    equation.Children.Add(node);
             }
             else
             {
-                equation.Children.Add(P_Term());
-                equation.Children.Add(P_Equation_D());
+                Node term = P_Term();
+                if (term != null)
+                    equation.Children.Add(term);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected term in equation.");
+                Node equationD = P_Equation_D();
+                if (equationD != null)
+                    equation.Children.Add(equationD);
             }
             return equation;
         }
         Node P_Equation_D()
         {
             // Ops Equation Equation’ | epsilon
-            Node equationD = new Node("EquationD");
-            if(IsArithmaticOperator())            
+            Node equationD = new Node("Equation'");
+            SkipComments();
+            if (IsArithmaticOperator())
             {
-                equationD.Children.Add(P_Arithmatic_Operator());
-                equationD.Children.Add(P_Equation());
-                equationD.Children.Add(P_Equation_D());
+                Node arithmaticOperator = P_Arithmatic_Operator();
+                if (arithmaticOperator != null)
+                    equationD.Children.Add(arithmaticOperator);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected arithmatic operator in equation.");
+                Node equation = P_Equation();
+                if (equation != null)
+                    equationD.Children.Add(equation);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected equation after arithmatic operator.");
+                Node equationD_ = P_Equation_D();
+                if (equationD_ != null)
+                    equationD.Children.Add(equationD_);
                 return equationD;
             }
-            return null;
+            else
+                return null;
         }
-
         Node P_Condition()
         {
             //Condition → identifier ConditionOp Term
             Node condition = new Node("Condition");
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.Identifier)
             {
-                condition.Children.Add(match(Token_Class.Identifier));
-                condition.Children.Add(P_Condition_Operator());
-                condition.Children.Add(P_Term());
+                Node id = match(Token_Class.Identifier);
+                if (id != null)
+                    condition.Children.Add(id);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected identifier in condition.");
+                Node conditionOperator = P_Condition_Operator();
+                if (conditionOperator != null)
+                    condition.Children.Add(conditionOperator);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected condition operator in condition.");
+                Node term = P_Term();
+                if (term != null)
+                    condition.Children.Add(term);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected term in condition.");
             }
             return condition;
         }
@@ -175,22 +263,34 @@ namespace JASON_Compiler
         {
             //Condition_statement → Condition Condition_statement
             Node conditionStatement = new Node("ConditionStatement");
-
-            conditionStatement.Children.Add(P_Condition());
-            conditionStatement.Children.Add(P_Condition_statement_D());
-
+            SkipComments();
+            Node cond = P_Condition();
+            if (cond != null)
+                conditionStatement.Children.Add(cond);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected condition in condition statement.");
+            Node conditionStatementD = P_Condition_statement_D();
+            if (conditionStatementD != null)
+                conditionStatement.Children.Add(conditionStatementD);
             return conditionStatement;
         }
         Node P_Condition_statement_D()
         {
             //Condition_statement_D → Boolean_Operator Condition Condition_statement' | epsilon
-            Node conditionStatementD = new Node("ConditionStatementD");
+            Node conditionStatementD = new Node("ConditionStatement'");
+            SkipComments();
             if (   TokenStream[InputPointer].token_type == Token_Class.And_Operator 
                 || TokenStream[InputPointer].token_type == Token_Class.Or_Operator )
             {
-                conditionStatementD.Children.Add(P_Boolean_Operator());
+                Node bol = P_Boolean_Operator();
+                if (bol != null)
+                    conditionStatementD.Children.Add(bol);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected boolean operator in condition statement.");
                 conditionStatementD.Children.Add(P_Condition());
-                conditionStatementD.Children.Add(P_Condition_statement_D());
+                Node conditionStatementD_ = P_Condition_statement_D();
+                if (conditionStatementD_ != null)
+                    conditionStatementD.Children.Add(conditionStatementD_);
             }
             else  
                 return null; 
@@ -202,38 +302,72 @@ namespace JASON_Compiler
         Node P_Read_statement()
         {
             Node readStatement = new Node("ReadStatement");
-
-            readStatement.Children.Add(match(Token_Class.Read_Keyword));
-            readStatement.Children.Add(match(Token_Class.Identifier));
-            readStatement.Children.Add(match(Token_Class.Semicolon_Symbol));
-
+            SkipComments();
+            Node read = match(Token_Class.Read_Keyword);
+            if (read != null)
+                readStatement.Children.Add(read);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected 'read' keyword in read statement.");
+            Node id = P_Identifier();
+            if (id != null)
+                readStatement.Children.Add(id);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected identifier in read statement.");
+            Node semi = match(Token_Class.Semicolon_Symbol);
+            if (semi != null)
+                readStatement.Children.Add(semi);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected ';' in read statement.");
             return readStatement;
         }
         Node P_Write_statement()
         {
             // Write_statement → write Write_statement’
             Node writeStatement = new Node("WriteStatement");
-
-            writeStatement.Children.Add(match(Token_Class.Write_Keyword));
-            writeStatement.Children.Add(P_Write_statement_D());
-
+            SkipComments();
+            Node write = match(Token_Class.Write_Keyword);
+            if (write != null)
+                writeStatement.Children.Add(write);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected 'write' keyword in write statement.");
+            Node writeStatementD = P_Write_statement_D();
+            if (writeStatementD != null)
+                writeStatement.Children.Add(writeStatementD);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected expression or endl in write statement.");
             return writeStatement;
 
         }
         Node P_Write_statement_D()
         {
             // Write_statement’ → Expression ; | endl ;
-            Node writeStatementD = new Node("WriteStatementD");
-
+            Node writeStatementD = new Node("WriteStatement'");
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.String || IsEquation() || IsTerm())
             {
-                writeStatementD.Children.Add(P_Expression());
-                writeStatementD.Children.Add(match(Token_Class.Semicolon_Symbol));
+                Node exp = P_Expression();
+                if (exp != null)
+                    writeStatementD.Children.Add(exp);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected expression in write statement.");
+                Node semi = match(Token_Class.Semicolon_Symbol);
+                if (semi != null)
+                    writeStatementD.Children.Add(semi);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected ';' in write statement.");
             }
             else if (TokenStream[InputPointer].token_type == Token_Class.Endl_Keyword)
             {
-                writeStatementD.Children.Add(match(Token_Class.Endl_Keyword));
-                writeStatementD.Children.Add(match(Token_Class.Semicolon_Symbol));
+                Node endl = match(Token_Class.Endl_Keyword);
+                if (endl != null)
+                    writeStatementD.Children.Add(endl);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected 'endl' in write statement.");
+                Node semi = match(Token_Class.Semicolon_Symbol);
+                if (semi != null)
+                    writeStatementD.Children.Add(semi);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected ';' in write statement.");
             }
 
             return writeStatementD;
@@ -242,21 +376,33 @@ namespace JASON_Compiler
         Node P_Identifier()
         {
             Node identifier = new Node("Identifier");
-
-            identifier.Children.Add(match(Token_Class.Identifier));
-            identifier.Children.Add(P_Identifier_D());
-
+            SkipComments();
+            Node id = match(Token_Class.Identifier);
+            if (id != null)
+                identifier.Children.Add(id);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected identifier in identifier.");
+            Node id_D = P_Identifier_D();
+            if (id_D != null)
+                identifier.Children.Add(id_D);
             return identifier;
         }
         Node P_Identifier_D()
         {
-            Node identifier_D = new Node("IdentifierD");
-
+            Node identifier_D = new Node("Identifier'");
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.Assignment_Operator)
             {
-                identifier_D.Children.Add(match(Token_Class.Assignment_Operator));
-                identifier_D.Children.Add(P_Expression());
-
+                Node assign = match(Token_Class.Assignment_Operator);
+                if (assign != null)
+                    identifier_D.Children.Add(assign);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected assignment operator in identifier.");
+                Node exp = P_Expression();
+                if (exp != null)
+                    identifier_D.Children.Add(exp);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected expression in identifier.");
                 return identifier_D;
             }
             else
@@ -265,22 +411,36 @@ namespace JASON_Compiler
         Node P_Identifier_List()
         {
             Node identifier_list = new Node("IdentifierList");
-
-            identifier_list.Children.Add(P_Identifier());
-            identifier_list.Children.Add(P_Identifier_List_D());
-
+            SkipComments();
+            Node id = P_Identifier();
+            if (id != null)
+                identifier_list.Children.Add(id);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected identifier in identifier list.");
+            Node id_D = P_Identifier_List_D();
+            if (id_D != null)
+                identifier_list.Children.Add(id_D);
             return identifier_list;
         }
         Node P_Identifier_List_D()
         {
-            Node identifier_list_D = new Node("IdentifierListD");
-
+            Node identifier_list_D = new Node("IdentifierList'");
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.Comma_Symbol)
             {
-                identifier_list_D.Children.Add(match(Token_Class.Comma_Symbol));
-                identifier_list_D.Children.Add(P_Identifier());
-                identifier_list_D.Children.Add(P_Identifier_List_D());
-
+                Node comma = match(Token_Class.Comma_Symbol);
+                if (comma != null)
+                    identifier_list_D.Children.Add(comma);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected ',' in identifier list.");
+                Node id = match(Token_Class.Identifier);
+                if (id != null)
+                    identifier_list_D.Children.Add(id);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected identifier in identifier list.");
+                Node identifier_list_D_ = P_Identifier_List_D();
+                if (identifier_list_D_ != null)
+                    identifier_list_D.Children.Add(identifier_list_D_);
                 return identifier_list_D;
             }
             else
@@ -289,31 +449,65 @@ namespace JASON_Compiler
         Node P_Declaration_statement()
         {
             Node declarationStatement = new Node("DeclarationStatement");
-
-            declarationStatement.Children.Add(P_DataType());
-            declarationStatement.Children.Add(P_Identifier_List());
-            declarationStatement.Children.Add(match(Token_Class.Semicolon_Symbol));
-
+            SkipComments();
+            Node dataType = P_DataType();
+            if (dataType != null)
+                declarationStatement.Children.Add(dataType);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected data type in declaration statement.");
+            Node idl = P_Identifier_List();
+            if (idl != null)
+                declarationStatement.Children.Add(idl);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected identifier list in declaration statement.");
+            Node semi = match(Token_Class.Semicolon_Symbol);
+            if (semi != null)
+                declarationStatement.Children.Add(semi);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected ';' in declaration statement.");
             return declarationStatement;
         }
         Node P_Assignment_statement()
         {
             Node assignmentStatement = new Node("AssignmentStatement");
-
-            assignmentStatement.Children.Add(match(Token_Class.Identifier));
-            assignmentStatement.Children.Add(match(Token_Class.Assignment_Operator));
-            assignmentStatement.Children.Add(P_Expression());
-            assignmentStatement.Children.Add(match(Token_Class.Semicolon_Symbol));
-
+            SkipComments();
+            Node id = match(Token_Class.Identifier);
+            if (id != null)
+                assignmentStatement.Children.Add(id);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected identifier in assignment statement.");
+            Node assign = match(Token_Class.Assignment_Operator);
+            if (assign != null)
+                assignmentStatement.Children.Add(assign);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected assignment operator in assignment statement.");
+            Node exp = P_Expression();
+            if (exp != null)
+                assignmentStatement.Children.Add(exp);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected expression in assignment statement.");
+            Node semi = match(Token_Class.Semicolon_Symbol);
+            if (semi != null)
+                assignmentStatement.Children.Add(semi);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected ';' in assignment statement.");
             return assignmentStatement;
         }
         Node P_Repeat_statement()
         {
             Node repeatStatement = new Node("RepeatStatement");
-
-            repeatStatement.Children.Add(match(Token_Class.Repeat_Keyword));
+            SkipComments();
+            Node rep  = match(Token_Class.Repeat_Keyword);
+            if (rep != null)
+                repeatStatement.Children.Add(rep);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected 'repeat' keyword in repeat statement.");
             repeatStatement.Children.Add(P_Statements());
-            repeatStatement.Children.Add(match(Token_Class.Until_Keyword));
+            Node until = match(Token_Class.Until_Keyword);
+            if (until != null)
+                repeatStatement.Children.Add(until);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected 'until' keyword in repeat statement.");
             repeatStatement.Children.Add(P_Condition_statement());
 
             return repeatStatement;
@@ -323,29 +517,60 @@ namespace JASON_Compiler
         {
             //If_statement → if Condition_statement then Statements Ret_statement Else_if_statement Else_statement end
             Node ifStatement = new Node("IfStatement");
-            
-            ifStatement.Children.Add(match(Token_Class.If_Keyword));
+            SkipComments();
+            Node ifk = match(Token_Class.If_Keyword);
+            if (ifk != null)
+                ifStatement.Children.Add(ifk);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected 'if' keyword in if statement.");
             ifStatement.Children.Add(P_Condition_statement());
-            ifStatement.Children.Add(match(Token_Class.Then_Keyword));
-            ifStatement.Children.Add(P_Statements());
-            ifStatement.Children.Add(P_Else_if_statement());
-            ifStatement.Children.Add(P_Else_statement());
-            ifStatement.Children.Add(match(Token_Class.End_Keyword));
-
+            Node then = match(Token_Class.Then_Keyword);
+            if (then != null)
+                ifStatement.Children.Add(then);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected 'then' keyword in if statement.");
+            Node stmts = P_Statements();
+            if (stmts.Children.Count > 0)
+                ifStatement.Children.Add(stmts);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected statements in if statement.");
+            Node Elif = P_Else_if_statement();
+            if (Elif != null)
+                ifStatement.Children.Add(Elif);
+            Node els = P_Else_statement();
+            if (els != null)
+                ifStatement.Children.Add(els);
+            Node end = match(Token_Class.End_Keyword);
+            if (end != null)
+                ifStatement.Children.Add(end);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected 'end' keyword in if statement.");
             return ifStatement;
         }
         Node P_Else_if_statement()
         {
-            // Else_if_statement → else if Condition_statement then Statements Ret_statement Else_statement | epsilon
+            // Else_if_statement → else if Condition_statement then Statements  Else_statement | epsilon
             Node elseIfStatement = new Node("ElseIfStatement");
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.Else_If_Keyword)
             {
-                elseIfStatement.Children.Add(match(Token_Class.Else_If_Keyword));
+                Node elif = match(Token_Class.Else_If_Keyword);
+                if (elif != null)
+                    elseIfStatement.Children.Add(elif);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected 'else if' keyword in else if statement.");
                 elseIfStatement.Children.Add(P_Condition_statement());
-                elseIfStatement.Children.Add(match(Token_Class.Then_Keyword));
-                elseIfStatement.Children.Add(P_Statements());
+                Node then = match(Token_Class.Then_Keyword);
+                if (then != null)
+                    elseIfStatement.Children.Add(then);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected 'then' keyword in else if statement.");
+                Node stmts = P_Statements();
+                if (stmts.Children.Count > 0)
+                    elseIfStatement.Children.Add(stmts);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected statements in else if statement.");
                 elseIfStatement.Children.Add(P_Else_statement());
-
                 return elseIfStatement;
             }
             else
@@ -355,11 +580,19 @@ namespace JASON_Compiler
         {
             // Else_statement → else Statements | epsilon
             Node elseStatement = new Node("ElseStatement");
-
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.Else_Keyword)
             {
-                elseStatement.Children.Add(match(Token_Class.Else_Keyword));
-                elseStatement.Children.Add(P_Statements());
+                Node elsek = match(Token_Class.Else_Keyword);
+                if (elsek != null)
+                    elseStatement.Children.Add(elsek);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected 'else' keyword in else statement.");
+                Node stmts = P_Statements();
+                if (stmts.Children.Count > 0)
+                    elseStatement.Children.Add(stmts);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected statements in else statement.");
                 return elseStatement;
             }
             else
@@ -369,7 +602,7 @@ namespace JASON_Compiler
         Node P_Statement()
         {
             Node statement = new Node("Statement");
-
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.Write_Keyword)
             {
                 statement.Children.Add(P_Write_statement());
@@ -403,57 +636,90 @@ namespace JASON_Compiler
                 statement.Children.Add(P_Function_call());
                 statement.Children.Add(match(Token_Class.Semicolon_Symbol));
             }
+            else if (TokenStream[InputPointer].token_type == Token_Class.Comment_Statement)
+            {
+                statement.Children.Add(match(Token_Class.Comment_Statement));
+            }
             else
             {
-                Errors.Error_List.Add("Parsing Error: Expected Statement and " + TokenStream[InputPointer].token_type.ToString() + " found\r\n");
-                InputPointer++;
+                Errors.Error_List.Add("Parsing Error: Expected a valid statement.");
+                Recover();
+                return null;
             }
-                return statement;
+            return statement;
         }
         Node P_Statements()
         {
             Node statements = new Node("Statements");
-
-            statements.Children.Add(P_Statement());
-            statements.Children.Add(P_Statements_D());
+            SkipComments();
+            Node stmt = P_Statement();
+            if (stmt != null)
+                statements.Children.Add(stmt);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected statement in statements.");
+            Node statementsD = P_Statements_D();
+            if (statementsD != null)
+                statements.Children.Add(statementsD);
             return statements;
         }
         Node P_Statements_D()
         {
-            Node statementsD = new Node("StatementsD");
-
+            Node statementsD = new Node("Statements'");
+            SkipComments();
             if (IsStartOfStatement() == true)
             {
-                statementsD.Children.Add(P_Statement());
-                statementsD.Children.Add(P_Statements_D());
-
+                Node stmt = P_Statement();
+                if (stmt != null)
+                    statementsD.Children.Add(stmt);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected statement in statements.");
+                Node statementsD_ = P_Statements_D();
+                if (statementsD_ != null)
+                    statementsD.Children.Add(statementsD_);
                 return statementsD;
             }
             return null;
-
         }
 
         Node P_Return_statement()
         {
             Node returnStatement = new Node("ReturnStatement");
-
-            returnStatement.Children.Add(match(Token_Class.Return_Keyword));
-            returnStatement.Children.Add(P_Expression());
-            returnStatement.Children.Add(match(Token_Class.Semicolon_Symbol));
-
+            SkipComments();
+            Node returnKeyword = match(Token_Class.Return_Keyword);
+            if (returnKeyword != null)
+                returnStatement.Children.Add(returnKeyword);
+            else
+                return null;
+            Node exp = P_Expression();
+            if (exp != null)
+                returnStatement.Children.Add(exp);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected expression in return statement.");
+            Node sm = match(Token_Class.Semicolon_Symbol);
+            if (sm != null)
+                returnStatement.Children.Add(sm);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected ';' in return statement.");
             return returnStatement;
         }
-
         Node P_Parameter()
         {
             Node parameter = new Node("Parameter");
-
+            SkipComments();
             if (   TokenStream[InputPointer].token_type == Token_Class.Int_DataType 
                 || TokenStream[InputPointer].token_type == Token_Class.Float_DataType 
                 || TokenStream[InputPointer].token_type == Token_Class.String_DataType )
             {
-                parameter.Children.Add(match(TokenStream[InputPointer].token_type));
-                parameter.Children.Add(match(Token_Class.Identifier));
+                Node node = match(TokenStream[InputPointer].token_type);
+                if (node != null)
+                    parameter.Children.Add(node);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected data type in parameter.");
+                Node id = match(Token_Class.Identifier);
+                if (id != null)
+                    parameter.Children.Add(id);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected identifier in parameter.");
                 return parameter;
             }
             else
@@ -462,21 +728,37 @@ namespace JASON_Compiler
         Node P_Parameters()
         {
             Node parameters = new Node("Parameters");
-
-            parameters.Children.Add(P_Parameter());
-            parameters.Children.Add(P_Parameters_D());
-
+            SkipComments();
+            Node parameter = P_Parameter();
+            if (parameter != null)
+                parameters.Children.Add(parameter);
+            else
+                return null;
+            Node parameter_D = P_Parameters_D();
+            if (parameter_D != null)
+                parameters.Children.Add(parameter_D);
             return parameters;
         }
         Node P_Parameters_D()
         {
-            Node parameterD = new Node("ParametersD");
-
+            Node parameterD = new Node("Parameters'");
+            SkipComments();
             if (TokenStream[InputPointer].token_type == Token_Class.Comma_Symbol)
             {
-                parameterD.Children.Add(match(Token_Class.Comma_Symbol));
-                parameterD.Children.Add(P_Parameter());
-                parameterD.Children.Add(P_Parameters_D());
+                Node comma = match(Token_Class.Comma_Symbol);
+                if (comma != null)
+                    parameterD.Children.Add(comma);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected ',' in parameters.");
+                Node parameter = P_Parameter();
+                if (parameter != null)
+                    parameterD.Children.Add(parameter);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected parameter in parameters.");
+                Node parameterD_ = P_Parameters_D();
+                if (parameterD_ != null)
+                    parameterD.Children.Add(parameterD_);
+                return parameterD;
             }
             return null;
         }
@@ -484,51 +766,134 @@ namespace JASON_Compiler
         Node P_Function_call()
         {
             Node functionCall = new Node("FunctionCall");
-
-            functionCall.Children.Add(match(Token_Class.Identifier));
-            functionCall.Children.Add(match(Token_Class.Open_Parenthesis));
-
-            if (TokenStream[InputPointer].token_type == Token_Class.Identifier)
-                functionCall.Children.Add(match(Token_Class.Identifier));
-
-            functionCall.Children.Add(match(Token_Class.Close_Parenthesis));
+            SkipComments();
+            Node id = match(Token_Class.Identifier);
+            if (id != null)
+                functionCall.Children.Add(id);
+            Node open = match(Token_Class.Open_Parenthesis);
+            if (open != null)
+                functionCall.Children.Add(open);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected '(' in function call.");
+            if (TokenStream[InputPointer].token_type == Token_Class.Identifier ||
+                TokenStream[InputPointer].token_type == Token_Class.Number ||
+                TokenStream[InputPointer].token_type == Token_Class.String)
+            {
+                Node expression = P_Expression();
+                if (expression != null)
+                    functionCall.Children.Add(expression);
+                Node exp_D = P_Function_call_D();
+                if (exp_D != null)
+                    functionCall.Children.Add(exp_D);
+            }
+            Node node = match(Token_Class.Close_Parenthesis);
+            if (node != null)
+                functionCall.Children.Add(node);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected ')' in function call.");
             return functionCall;
-
+        }
+        Node P_Function_call_D() {
+            Node functionCallD = new Node("FunctionCall'");
+            SkipComments();
+            if (TokenStream[InputPointer].token_type == Token_Class.Comma_Symbol)
+            {
+                Node comma = match(Token_Class.Comma_Symbol);
+                if (comma != null)
+                    functionCallD.Children.Add(comma);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected ',' in function call.");
+                Node expression = P_Expression();
+                if (expression != null)
+                    functionCallD.Children.Add(expression);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected expression in function call.");
+                Node functionCallD_ = P_Function_call_D();
+                if (functionCallD_ != null)
+                    functionCallD.Children.Add(functionCallD_);
+                return functionCallD;
+            }
+            return null;
         }
         Node P_Function_declaration()
         {
             Node functionDeclaration = new Node("FunctionDeclaration");
-
-            functionDeclaration.Children.Add(P_DataType());
-            functionDeclaration.Children.Add(match(Token_Class.Identifier));
-            functionDeclaration.Children.Add(match(Token_Class.Open_Parenthesis));
-            functionDeclaration.Children.Add(P_Parameters());
-            functionDeclaration.Children.Add(match(Token_Class.Close_Parenthesis));
-
+            SkipComments();
+            Node dataType = P_DataType();
+            if (dataType != null)
+                functionDeclaration.Children.Add(dataType);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected data type in function declaration.");
+            Node id = match(Token_Class.Identifier);
+            if (id != null)
+                functionDeclaration.Children.Add(id);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected identifier in function declaration.");
+            Node open = match(Token_Class.Open_Parenthesis);
+            if (open != null)
+                functionDeclaration.Children.Add(open);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected '(' in function declaration.");
+            Node parameters = P_Parameters();
+            if (parameters != null)
+                functionDeclaration.Children.Add(parameters);
+            Node node = match(Token_Class.Close_Parenthesis);
+            if (node != null)
+                functionDeclaration.Children.Add(node);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected ')' in function declaration.");
             return functionDeclaration;
         }
         Node P_Function_body()
         {
             Node functionBody = new Node("FunctionBody");
+            SkipComments();
+            Node open = match(Token_Class.Open_Brace);
+            if (open != null)
+                functionBody.Children.Add(open);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected '{' to start function body.");
+            if (IsStartOfStatement())
+            {
+                Node statements = P_Statements();
+                if (statements != null)
+                    functionBody.Children.Add(statements);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected statements inside function body.");
+            }
 
-            functionBody.Children.Add(match(Token_Class.Open_Brace));
-            functionBody.Children.Add(P_Statements());
-            functionBody.Children.Add(P_Return_statement());
-            functionBody.Children.Add(match(Token_Class.Close_Brace));
+            Node returnStatement = P_Return_statement();
+            if (returnStatement != null)
+                functionBody.Children.Add(returnStatement);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected return statement inside function body.");
+            Node close = match(Token_Class.Close_Brace);
+            if (close != null)
+                functionBody.Children.Add(close);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected '}' to end function body.");
 
             return functionBody;
         }
         Node P_Function()
         {
             Node functionStatement = new Node("Function");
-
+            SkipComments();
             if ( ( TokenStream[InputPointer].token_type == Token_Class.Int_DataType
                 || TokenStream[InputPointer].token_type == Token_Class.Float_DataType
                 || TokenStream[InputPointer].token_type == Token_Class.String_DataType )
                 && TokenStream[InputPointer + 1].token_type != Token_Class.Main_Keyword)
             {
-                functionStatement.Children.Add(P_Function_declaration());
-                functionStatement.Children.Add(P_Function_body());
+                Node functionDeclaration = P_Function_declaration();
+                if (functionDeclaration != null)
+                    functionStatement.Children.Add(functionDeclaration);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected function declaration.");
+                Node functionBody = P_Function_body();
+                if (functionBody != null)
+                    functionStatement.Children.Add(functionBody);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected function body.");
                 return functionStatement;
             }
             else
@@ -538,24 +903,32 @@ namespace JASON_Compiler
         {
 
             Node functionStatements = new Node("Functions");
-
-            functionStatements.Children.Add(P_Function());
-            //functionStatements.Children.Add(P_Functions_D());
-
+            SkipComments();
+            Node functions = P_Function();
+            if (functions == null)
+                return null;
+            else
+                functionStatements.Children.Add(functions);
+            Node functions_d = P_Functions_D();
+            if (functions_d != null)
+                functionStatements.Children.Add(functions_d);
             return functionStatements;
         }
         Node P_Functions_D()
         {
 
-            Node functionStatementsD = new Node("FunctionsD");
-
+            Node functionStatementsD = new Node("Functions'");
+            SkipComments();
             if ((  TokenStream[InputPointer].token_type == Token_Class.Int_DataType 
                 || TokenStream[InputPointer].token_type == Token_Class.Float_DataType  
                 || TokenStream[InputPointer].token_type == Token_Class.String_DataType  )
                 && TokenStream[InputPointer + 1].token_type != Token_Class.Main_Keyword )
             {
-
-                functionStatementsD.Children.Add(P_Functions());
+                Node functionStatements = P_Function();
+                if (functionStatements != null)
+                    functionStatementsD.Children.Add(functionStatements);
+                else
+                    Errors.Error_List.Add("Parsing Error: Expected function declaration.");
                 return functionStatementsD;
             }
             return null;
@@ -564,25 +937,56 @@ namespace JASON_Compiler
         Node P_Main_function()
         {
             Node mainFunction = new Node("MainFunction");
-
-            mainFunction.Children.Add(match(Token_Class.Int_DataType));
-            mainFunction.Children.Add(match(Token_Class.Main_Keyword));
-            mainFunction.Children.Add(match(Token_Class.Open_Parenthesis));
-            mainFunction.Children.Add(match(Token_Class.Close_Parenthesis));
-            mainFunction.Children.Add(match(Token_Class.Open_Brace));
-            mainFunction.Children.Add(P_Statements());
-            mainFunction.Children.Add(P_Return_statement());
-            mainFunction.Children.Add(match(Token_Class.Close_Brace));
+            SkipComments();
+            Node intaneger = match(Token_Class.Int_DataType);
+            if (intaneger != null)
+                mainFunction.Children.Add(intaneger);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected 'int' data type in main function.");
+            Node mani = match(Token_Class.Main_Keyword);
+            if (mani != null)
+                mainFunction.Children.Add(mani);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected 'main' keyword in main function.");
+            Node open = match(Token_Class.Open_Parenthesis);
+            if (open != null)
+                mainFunction.Children.Add(open);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected '(' in main function.");
+            Node close = match(Token_Class.Close_Parenthesis);
+            if (close != null)
+                mainFunction.Children.Add(close);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected ')' in main function.");
+            Node openBrace = match(Token_Class.Open_Brace);
+            if (openBrace != null)
+                mainFunction.Children.Add(openBrace);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected '{' to start main function.");
+            Node stmts = P_Statements();
+            if (stmts != null)
+                mainFunction.Children.Add(stmts);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected statements inside main function.");
+            Node returnStatement = P_Return_statement();
+            if (returnStatement != null)
+                mainFunction.Children.Add(returnStatement);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected return statement inside main function.");
+            Node closeBrace = match(Token_Class.Close_Brace);
+            if (closeBrace != null)
+                mainFunction.Children.Add(closeBrace);
+            else
+                Errors.Error_List.Add("Parsing Error: Expected '}' to end main function.");
 
             return mainFunction;
         }
 
         public Node match(Token_Class ExpectedToken)
         {
+            SkipComments();
             if (InputPointer < TokenStream.Count)
             {
-                if(TokenStream[InputPointer].token_type == Token_Class.Comment_Statement)
-                    InputPointer++;
                 if (ExpectedToken == TokenStream[InputPointer].token_type)
                 {
                     InputPointer++;
@@ -599,9 +1003,9 @@ namespace JASON_Compiler
             }
             else
             {
-                Errors.Error_List.Add("Parsing Error: Expected " + ExpectedToken.ToString()  + "\r\n");
-                InputPointer++;
-                return null;
+                Errors.Error_List.Add("Parsing Error: Expected " + ExpectedToken.ToString() + " but " +
+                                        TokenStream[InputPointer].token_type.ToString() + " ('" + TokenStream[InputPointer].token_type + "') found at input position " + InputPointer + ".\r\n");
+                return null; 
             }
         }
 
@@ -631,25 +1035,21 @@ namespace JASON_Compiler
         }
         bool IsStartOfStatement()
         {
-            if (InputPointer >= TokenStream.Count)
-                return false;
+            if (InputPointer >= TokenStream.Count) return false;
 
             Token_Class currentToken = TokenStream[InputPointer].token_type;
-            Token_Class nextToken = Token_Class.Unknown; // Assuming Token_Class.Null or a similar placeholder exists
-            if (InputPointer + 1 < TokenStream.Count)
-        {
-                nextToken = TokenStream[InputPointer + 1].token_type;
-            }
-
+            Token_Class nextToken = Token_Class.Unknown;
+            if (InputPointer + 1 < TokenStream.Count) nextToken = TokenStream[InputPointer + 1].token_type;
             if (currentToken == Token_Class.Write_Keyword) return true;
             if (currentToken == Token_Class.Read_Keyword) return true;
             if (currentToken == Token_Class.Identifier && nextToken == Token_Class.Assignment_Operator) return true;
             if (currentToken == Token_Class.Int_DataType ||
                 currentToken == Token_Class.Float_DataType ||
-                currentToken == Token_Class.String_DataType) return true; // Declaration
+                currentToken == Token_Class.String_DataType) return true;
             if (currentToken == Token_Class.If_Keyword) return true;
             if (currentToken == Token_Class.Repeat_Keyword) return true;
-            if (currentToken == Token_Class.Identifier && nextToken == Token_Class.Open_Parenthesis) return true; // Function call statement
+            if (currentToken == Token_Class.Identifier && nextToken == Token_Class.Open_Parenthesis) return true; 
+
 
             return false;
         }
@@ -683,7 +1083,13 @@ namespace JASON_Compiler
             }
             return false;
         }
-
+        private void SkipComments()
+        {
+            while (InputPointer < TokenStream.Count && TokenStream[InputPointer].token_type == Token_Class.Comment_Statement)
+            {
+                InputPointer++;
+            }
+        }
     }
 
 }
